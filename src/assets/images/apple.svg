@@ -1,0 +1,26 @@
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="appleGradient" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#ff6b6b" />
+      <stop offset="50%" stop-color="#cc0000" />
+      <stop offset="100%" stop-color="#800000" />
+    </radialGradient>
+    <linearGradient id="leafGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#76c442" />
+      <stop offset="100%" stop-color="#4a8a2a" />
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="2" dy="2" stdDeviation="2" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <!-- Apple Body -->
+    <path d="M50 85 C 20 85, 10 50, 10 35 C 10 15, 30 10, 50 25 C 70 10, 90 15, 90 35 C 90 50, 80 85, 50 85" fill="url(#appleGradient)" stroke="#660000" stroke-width="1"/>
+    <!-- Highlight -->
+    <ellipse cx="35" cy="35" rx="10" ry="15" fill="white" opacity="0.2" transform="rotate(-20 35 35)"/>
+    <!-- Stem -->
+    <path d="M50 25 Q 50 15 55 10" stroke="#5d4037" stroke-width="3" fill="none"/>
+    <!-- Leaf -->
+    <path d="M50 25 Q 30 15 40 5 Q 60 10 50 25" fill="url(#leafGradient)"/>
+  </g>
+</svg>
