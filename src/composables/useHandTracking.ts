@@ -75,7 +75,11 @@ const onResults = (results: Results) => {
   }
 }
 
-const initHandTracking = (externalVideo?: HTMLVideoElement) => {
+const setVideoElement = (el: HTMLVideoElement) => {
+  videoRef.value = el
+}
+
+const initHandTracking = () => {
   if (hands) return // Already initialized
 
   // Access globals from CDN scripts
@@ -100,16 +104,7 @@ const initHandTracking = (externalVideo?: HTMLVideoElement) => {
 
   hands.onResults(onResults)
 
-  // Use external video if provided, otherwise create hidden one
-  if (externalVideo) {
-    videoRef.value = externalVideo
-  } else if (!videoRef.value) {
-    const video = document.createElement('video')
-    video.style.display = 'none'
-    document.body.appendChild(video)
-    videoRef.value = video
-  }
-
+  // Start camera if video element is available
   if (videoRef.value) {
     startCamera(videoRef.value)
   }
@@ -197,6 +192,7 @@ export function useHandTracking() {
     handData,
     videoRef,
     isCameraReady,
+    setVideoElement,
     initHandTracking,
     stopHandTracking
   }

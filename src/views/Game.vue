@@ -641,7 +641,10 @@ const spawnFruit = () => {
     restitution: 0.6,
     frictionAir: 0.005,
     label: isBomb ? 'bomb' : 'fruit',
-    angle: Math.random() * Math.PI * 2
+    angle: Math.random() * Math.PI * 2,
+    collisionFilter: {
+        group: -1 // Never collide with other fruits
+    }
   })
 
   const minVelocityY = height * 0.024 
@@ -914,6 +917,11 @@ onMounted(() => {
 
   initPhysics()
   
+  // Start Camera only when game mounts
+  // useHandTracking composable exposes initHandTracking directly
+  const { initHandTracking } = useHandTracking()
+  initHandTracking()
+
   // Check if camera is already ready
   if (isCameraReady.value) {
       loading.value = false
