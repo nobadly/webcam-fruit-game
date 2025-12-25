@@ -4,6 +4,7 @@ import { Camera } from '@mediapipe/camera_utils'
 
 // Workaround for MediaPipe Hands in Vite production build
 const SafeHands = (Hands as any)?.default || Hands;
+const SafeCamera = (Camera as any)?.default || Camera;
 
 // Global State
 const cursor = reactive({
@@ -56,7 +57,7 @@ const onResults = (results: Results) => {
   }
 }
 
-const initHandTracking = () => {
+const initHandTracking = (externalVideo?: HTMLVideoElement) => {
   if (hands) return // Already initialized
 
   hands = new SafeHands({
@@ -72,8 +73,10 @@ const initHandTracking = () => {
 
   hands.onResults(onResults)
 
-  // Create a hidden video element for the camera if not provided
-  if (!videoRef.value) {
+  // Use external video if provided, otherwise create hidden one
+  if (externalVideo) {
+    videoRef.value = externalVideo
+  } else if (!videoRef.value) {
     const video = document.createElement('video')
     video.style.display = 'none'
     document.body.appendChild(video)
@@ -81,7 +84,7 @@ const initHandTracking = () => {
   }
 
   if (videoRef.value) {
-    camera = new Camera(videoRef.value, {
+    camera = new SafeCamera(videoRef.value, {
       onFrame: async () => {
         if (hands && videoRef.value && videoRef.value.readyState >= 2) {
             // Safety check for dimensions

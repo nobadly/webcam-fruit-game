@@ -17,11 +17,27 @@ const { handData, cursor, isCameraReady } = useHandTracking()
 
 const score = ref(0)
 const lives = ref(3)
+const combo = ref(0)
+const maxCombo = ref(0)
+const lastSliceTime = ref(0)
 const gameCanvasRef = ref<HTMLCanvasElement | null>(null)
 const loading = ref(true)
 const countdown = ref(5)
 const showCountdown = ref(false)
 const gameStarted = ref(false)
+
+// Floating text popups
+interface Popup {
+  id: number;
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  life: number;
+  velocity: number;
+}
+const popups = ref<Popup[]>([])
+let popupIdCounter = 0
 
 // Hand tracking state (local mapping for game)
 const handPosition = ref<{x: number, y: number} | null>(null)
@@ -208,7 +224,31 @@ const checkSlicing = () => {
     
     if (distToFruit < fruitRadius + 20) { 
       bodiesToRemove.push(id.toString())
-      score.value += 10
+      
+      // Combo Logic
+      const now = Date.now()
+      if (now - lastSliceTime.value < 500) {
+        combo.value++
+      } else {
+        combo.value = 1
+      }
+      lastSliceTime.value = now
+      if (combo.value > maxCombo.value) maxCombo.value = combo.value
+
+      const points = 10 * combo.value
+      score.value += points
+
+      // Add popup
+      popups.value.push({
+        id: popupIdCounter++,
+        x: position.x,
+        y: position.y - 30,
+        text: combo.value > 1 ? `+${points} (${combo.value}x)` : `+${points}`,
+        color: '#ffffff',
+        life: 1.0,
+        velocity: 2
+      })
+
       createParticles(position.x, position.y, fruit.color)
     }
   })
@@ -396,6 +436,41 @@ const renderGame = () => {
     ctx.stroke()
     ctx.shadowBlur = 0
   }
+
+  // Draw Popups
+  ctx.font = 'bold 24px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  
+  for (let i = popups.value.length - 1; i >= 0; i--) {
+    const p = popups.value[i]
+    p.y -= p.velocity
+    p.life -= 0.02
+    
+    if (p.life <= 0) {
+      popups.value.splice(i, 1)
+      continue
+    }
+    
+    const scale = 1 + (1 - p.life) * 0.5 // Grow slightly
+    
+    ctx.save()
+    ctx.translate(p.x, p.y)
+    ctx.scale(scale, scale)
+    ctx.globalAlpha = p.life
+    
+    // Text Shadow/Outline
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'
+    ctx.shadowBlur = 4
+    ctx.fillStyle = p.color
+    ctx.strokeStyle = '#000'
+    ctx.lineWidth = 3
+    ctx.strokeText(p.text, 0, 0)
+    ctx.fillText(p.text, 0, 0)
+    
+    ctx.restore()
+  }
+  ctx.globalAlpha = 1.0
 }
 
 onMounted(() => {
@@ -445,6 +520,16 @@ onUnmounted(() => {
         <div v-for="i in 3" :key="i" class="text-2xl" :class="i <= lives ? 'opacity-100' : 'opacity-30 grayscale'">
           ❤️
         </div>
+      </div>
+    </div>
+
+    <!-- Combo Indicator -->
+    <div 
+      class="absolute top-24 left-4 z-10 transition-all duration-300 pointer-events-none"
+      :class="combo > 1 ? 'opacity-100 scale-100' : 'opacity-0 scale-50'"
+    >
+      <div class="text-3xl font-black text-yellow-300 italic drop-shadow-[0_0_10px_rgba(255,215,0,0.8)] stroke-black">
+        COMBO x{{ combo }}
       </div>
     </div>
 
