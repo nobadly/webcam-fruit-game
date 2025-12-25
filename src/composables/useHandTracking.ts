@@ -2,6 +2,9 @@ import { ref, reactive } from 'vue'
 import { Hands, type Results } from '@mediapipe/hands'
 import { Camera } from '@mediapipe/camera_utils'
 
+// Workaround for MediaPipe Hands in Vite production build
+const SafeHands = (Hands as any)?.default || Hands;
+
 // Global State
 const cursor = reactive({
   x: 0,
@@ -56,8 +59,8 @@ const onResults = (results: Results) => {
 const initHandTracking = () => {
   if (hands) return // Already initialized
 
-  hands = new Hands({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+  hands = new SafeHands({
+    locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
   })
 
   hands.setOptions({
