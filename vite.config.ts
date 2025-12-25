@@ -1,3 +1,13 @@
+/*
+ * @Author: xianggan
+ * @Date: 2025-12-25 10:12:28
+ * @LastEditors: xianggan
+ * @LastEditTime: 2025-12-25 10:14:58
+ * @FilePath: \webcam-fruit-game\vite.config.ts
+ * @Description: 
+ * 
+ * 
+ */
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
@@ -7,7 +17,8 @@ import traeBadgePlugin from 'vite-plugin-trae-solo-badge'
 // https://vite.dev/config/
 export default defineConfig({
   build: {
-    sourcemap: 'hidden',
+    outDir: 'docs',
+    sourcemap: false,
   },
   plugins: [
     vue(),
