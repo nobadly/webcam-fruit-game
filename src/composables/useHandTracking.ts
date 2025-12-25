@@ -1,10 +1,25 @@
 import { ref, reactive } from 'vue'
 import { Hands, type Results } from '@mediapipe/hands'
 import { Camera } from '@mediapipe/camera_utils'
+import * as Cam from '@mediapipe/camera_utils'
+import * as H from '@mediapipe/hands'
 
 // Workaround for MediaPipe Hands in Vite production build
-const SafeHands = (Hands as any)?.default || Hands;
-const SafeCamera = (Camera as any)?.default || Camera;
+const findConstructor = (mod: any, name: string) => {
+  if (!mod) return null;
+  // If it's already the constructor
+  if (typeof mod === 'function') return mod;
+  // If it's on .default
+  if (mod.default && typeof mod.default === 'function') return mod.default;
+  // If it's on .[name] (e.g. .Hands)
+  if (mod[name] && typeof mod[name] === 'function') return mod[name];
+  // If it's on .default.[name]
+  if (mod.default && mod.default[name] && typeof mod.default[name] === 'function') return mod.default[name];
+  return null;
+};
+
+const SafeHands = findConstructor(H, 'Hands') || findConstructor(Hands, 'Hands') || Hands;
+const SafeCamera = findConstructor(Cam, 'Camera') || findConstructor(Camera, 'Camera') || Camera;
 
 // Global State
 const cursor = reactive({
@@ -60,6 +75,11 @@ const onResults = (results: Results) => {
 const initHandTracking = (externalVideo?: HTMLVideoElement) => {
   if (hands) return // Already initialized
 
+  if (!SafeHands) {
+    console.error('Failed to load MediaPipe Hands');
+    return;
+  }
+
   hands = new SafeHands({
     locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
   })
@@ -84,6 +104,10 @@ const initHandTracking = (externalVideo?: HTMLVideoElement) => {
   }
 
   if (videoRef.value) {
+    if (!SafeCamera) {
+        console.error('Failed to load MediaPipe Camera');
+        return;
+    }
     camera = new SafeCamera(videoRef.value, {
       onFrame: async () => {
         if (hands && videoRef.value && videoRef.value.readyState >= 2) {
