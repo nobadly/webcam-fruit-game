@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Volume2, VolumeX, Eye, EyeOff } from 'lucide-vue-next'
 import Matter from 'matter-js'
@@ -212,6 +212,22 @@ const spawnLoop = () => {
   fruitSpawnerInterval = window.setTimeout(spawnLoop, delay)
 }
 
+// Use watchEffect to poll cursor state independently of camera frames
+// This ensures 120Hz/144Hz touch response even if camera is 30Hz or not ready
+watchEffect(() => {
+  // If cursor is active and recent, override Hand 1
+  // We use a small window here. The actual game loop will use the latest value.
+  if (cursor.active && (cursor.source === 'mouse' || cursor.source === 'touch')) { // Ensure source is checked
+     // Logic is already in the main watcher, but the main watcher depends on handData.
+     // We need to update rawHandPositions even if handData doesn't change.
+     
+     const newX = cursor.x / window.innerWidth
+     const newY = cursor.y / window.innerHeight
+     rawHandPositions.value[0] = { x: newX, y: newY }
+     rawHandPositions.value[1] = null
+  }
+})
+
 // Watch global hand data to update local game state
 watch(handData, (results) => {
   if (!results) return
@@ -222,42 +238,51 @@ watch(handData, (results) => {
     startCountdown()
   }
 
-  // Update hand positions (Multi-hand)
-  // Reset raw positions first if no hands detected? 
-  // MediaPipe results.multiHandLandmarks is array of hands
+  // Update hand positions (Multi-hand) from Cursor (Mouse/Touch) or Camera
+  // Note: We prioritize cursor if active in the watchEffect above, 
+  // but we also need to handle camera data here.
   
-  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-    // Clear previous if count changed? No, just update available ones.
-    // If only 1 hand, set 2nd to null.
-    
-    // Hand 1
-    if (results.multiHandLandmarks[0]) {
-        const indexTip = results.multiHandLandmarks[0][8]
-        rawHandPositions.value[0] = { x: 1 - indexTip.x, y: indexTip.y }
-    } else {
-        rawHandPositions.value[0] = null
-    }
-    
-    // Hand 2
-    if (results.multiHandLandmarks[1]) {
-        const indexTip = results.multiHandLandmarks[1][8]
-        rawHandPositions.value[1] = { x: 1 - indexTip.x, y: indexTip.y }
-    } else {
-        rawHandPositions.value[1] = null
-    }
-    
+  // If cursor is actively being used (recent movement), ignore camera for a moment
+  // Actually, let's keep the logic simple: 
+  // If cursor.active is true (set by mousemove/touchmove), use it.
+  // Else use camera.
+  
+  // However, cursor.active stays true. We need a timeout logic.
+  // In useHandTracking, we have MOUSE_TIMEOUT.
+  // Let's rely on that.
+  
+  // Re-implement priority logic here to ensure camera works when mouse is idle
+  if (cursor.active && (cursor.source === 'mouse' || cursor.source === 'touch')) {
+      // Handled by watchEffect mostly, but let's confirm
+      // If we are here, it means handData updated. 
+      // If mouse is active, we overwrite whatever camera said.
+      const newX = cursor.x / window.innerWidth
+      const newY = cursor.y / window.innerHeight
+      rawHandPositions.value[0] = { x: newX, y: newY }
+      rawHandPositions.value[1] = null
+  } else if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+      // Camera Logic
+      // Hand 1
+      if (results.multiHandLandmarks[0]) {
+          const indexTip = results.multiHandLandmarks[0][8]
+          rawHandPositions.value[0] = { x: 1 - indexTip.x, y: indexTip.y }
+      } else {
+          rawHandPositions.value[0] = null
+      }
+      
+      // Hand 2
+      if (results.multiHandLandmarks[1]) {
+          const indexTip = results.multiHandLandmarks[1][8]
+          rawHandPositions.value[1] = { x: 1 - indexTip.x, y: indexTip.y }
+      } else {
+          rawHandPositions.value[1] = null
+      }
   } else {
-    // Check if mouse is active fallback
-    if (cursor.active && cursor.source === 'mouse') {
-        const newX = cursor.x / window.innerWidth
-        const newY = cursor.y / window.innerHeight
-        // Mouse controls Hand 1
-        rawHandPositions.value[0] = { x: newX, y: newY }
-        rawHandPositions.value[1] = null
-    } else {
-        rawHandPositions.value[0] = null
-        rawHandPositions.value[1] = null
-    }
+     // No camera hands
+     if (!cursor.active) {
+         rawHandPositions.value[0] = null
+         rawHandPositions.value[1] = null
+     }
   }
 })
 
@@ -927,6 +952,15 @@ onMounted(() => {
       loading.value = false
       startCountdown()
   }
+
+  // Fallback: If camera takes too long (> 5s), disable loading so user can use touch
+  setTimeout(() => {
+    if (loading.value) {
+      console.warn('Camera load timeout - enabling touch fallback')
+      loading.value = false
+      startCountdown()
+    }
+  }, 5000)
 
   window.addEventListener('resize', () => {
     if (gameCanvasRef.value) {

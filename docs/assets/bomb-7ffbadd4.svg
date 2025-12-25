@@ -1,0 +1,19 @@
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fuse -->
+  <path d="M50 20 Q 50 10 60 10" stroke="#8B4513" stroke-width="4" fill="none"/>
+  <!-- Spark -->
+  <circle cx="60" cy="10" r="3" fill="orange">
+    <animate attributeName="r" values="3;5;3" dur="0.2s" repeatCount="indefinite" />
+    <animate attributeName="fill" values="orange;yellow;red;orange" dur="0.2s" repeatCount="indefinite" />
+  </circle>
+  
+  <!-- Bomb Body -->
+  <circle cx="50" cy="55" r="35" fill="#333" />
+  <circle cx="40" cy="45" r="8" fill="rgba(255,255,255,0.2)" />
+  
+  <!-- Skull Icon -->
+  <circle cx="50" cy="52" r="8" fill="#555" />
+  <circle cx="47" cy="50" r="2" fill="#333" />
+  <circle cx="53" cy="50" r="2" fill="#333" />
+  <rect x="48" y="56" width="4" height="6" fill="#555" rx="1" />
+</svg>

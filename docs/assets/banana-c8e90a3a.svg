@@ -1,0 +1,21 @@
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bananaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe135" />
+      <stop offset="100%" stop-color="#f9a602" />
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="2" dy="2" stdDeviation="2" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <!-- Banana Body -->
+    <path d="M20 20 Q 50 80 85 40 Q 90 35 95 30 Q 90 50 80 60 Q 50 100 20 40 Q 15 30 20 20" fill="url(#bananaGradient)" stroke="#cfaa00" stroke-width="1"/>
+    <!-- Stem -->
+    <path d="M15 25 L 20 20" stroke="#5d4037" stroke-width="4" stroke-linecap="round"/>
+    <!-- Tip -->
+    <circle cx="95" cy="30" r="2" fill="#5d4037"/>
+    <!-- Highlight -->
+    <path d="M30 30 Q 50 70 75 45" stroke="white" stroke-width="3" fill="none" opacity="0.3"/>
+  </g>
+</svg>

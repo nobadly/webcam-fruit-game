@@ -9,11 +9,18 @@ declare global {
 }
 
 // Global State
-const cursor = reactive({
+interface CursorState {
+  x: number
+  y: number
+  active: boolean
+  source: 'mouse' | 'hand' | 'touch'
+}
+
+const cursor = reactive<CursorState>({
   x: 0,
   y: 0,
   active: false, // true if hand detected or mouse moved recently
-  source: 'mouse' as 'mouse' | 'hand'
+  source: 'mouse'
 })
 
 // Types for results (simplified)
@@ -43,7 +50,7 @@ const updateCursorFromMouse = (e: MouseEvent) => {
 
 const updateCursorFromTouch = (e: TouchEvent) => {
   lastMouseMoveTime = Date.now() // Treat touch like mouse for timeout purposes
-  cursor.source = 'mouse' // Reuse mouse logic for touch
+  cursor.source = 'touch'
   cursor.active = true
   if (e.touches.length > 0) {
     cursor.x = e.touches[0].clientX
@@ -77,6 +84,10 @@ const onResults = (results: Results) => {
 
 const setVideoElement = (el: HTMLVideoElement) => {
   videoRef.value = el
+  // If hands initialized but camera not started (because videoRef was null), start it now
+  if (hands && !isCameraReady.value) {
+      startCamera(el)
+  }
 }
 
 const initHandTracking = () => {
@@ -119,10 +130,13 @@ let animationFrameId: number | null = null
 
 const startCamera = async (videoElement: HTMLVideoElement) => {
   try {
+    // Check if stream already exists
+    if (videoElement.srcObject) return
+
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
-        width: 1280,
-        height: 720,
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
         facingMode: 'user'
       }
     })
@@ -138,7 +152,13 @@ const startCamera = async (videoElement: HTMLVideoElement) => {
     // Performance optimization: Process frames at lower resolution
     // MediaPipe Hands works well even at 360p or 480p, while we display 720p/1080p
     const processFrame = async () => {
-      if (hands && videoElement && videoElement.readyState >= 2) {
+      // Check active state
+      if (!hands || !videoElement.srcObject) {
+         if (animationFrameId) cancelAnimationFrame(animationFrameId)
+         return 
+      }
+
+      if (videoElement.readyState >= 2) {
          if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
             // No need to resize manually, just let MediaPipe handle it or we could draw to smaller canvas first
             // But simply sending the video element is usually fine if modelComplexity is low
@@ -155,6 +175,8 @@ const startCamera = async (videoElement: HTMLVideoElement) => {
     
   } catch (err) {
     console.error('Error accessing webcam:', err)
+    // If camera fails, we should still set ready so game can proceed with mouse/touch
+    isCameraReady.value = true 
   }
 }
 
