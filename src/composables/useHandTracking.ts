@@ -1,25 +1,12 @@
 import { ref, reactive } from 'vue'
-import { Hands, type Results } from '@mediapipe/hands'
-import { Camera } from '@mediapipe/camera_utils'
-import * as Cam from '@mediapipe/camera_utils'
-import * as H from '@mediapipe/hands'
 
-// Workaround for MediaPipe Hands in Vite production build
-const findConstructor = (mod: any, name: string) => {
-  if (!mod) return null;
-  // If it's already the constructor
-  if (typeof mod === 'function') return mod;
-  // If it's on .default
-  if (mod.default && typeof mod.default === 'function') return mod.default;
-  // If it's on .[name] (e.g. .Hands)
-  if (mod[name] && typeof mod[name] === 'function') return mod[name];
-  // If it's on .default.[name]
-  if (mod.default && mod.default[name] && typeof mod.default[name] === 'function') return mod.default[name];
-  return null;
-};
-
-const SafeHands = findConstructor(H, 'Hands') || findConstructor(Hands, 'Hands') || Hands;
-const SafeCamera = findConstructor(Cam, 'Camera') || findConstructor(Camera, 'Camera') || Camera;
+// Global Type Definitions for MediaPipe
+declare global {
+  interface Window {
+    Hands: any;
+    Camera: any;
+  }
+}
 
 // Global State
 const cursor = reactive({
@@ -29,12 +16,18 @@ const cursor = reactive({
   source: 'mouse' as 'mouse' | 'hand'
 })
 
+// Types for results (simplified)
+interface Results {
+  multiHandLandmarks: any[];
+  image: any;
+}
+
 const handData = ref<Results | null>(null)
 const videoRef = ref<HTMLVideoElement | null>(null)
 const isCameraReady = ref(false)
 
-let camera: Camera | null = null
-let hands: Hands | null = null
+let camera: any = null
+let hands: any = null
 
 // Mouse fallback logic
 let lastMouseMoveTime = 0
@@ -75,12 +68,16 @@ const onResults = (results: Results) => {
 const initHandTracking = (externalVideo?: HTMLVideoElement) => {
   if (hands) return // Already initialized
 
-  if (!SafeHands) {
-    console.error('Failed to load MediaPipe Hands');
+  // Access globals from CDN scripts
+  const Hands = window.Hands;
+  const Camera = window.Camera;
+
+  if (!Hands) {
+    console.error('MediaPipe Hands not loaded from CDN');
     return;
   }
 
-  hands = new SafeHands({
+  hands = new Hands({
     locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
   })
 
@@ -104,11 +101,11 @@ const initHandTracking = (externalVideo?: HTMLVideoElement) => {
   }
 
   if (videoRef.value) {
-    if (!SafeCamera) {
-        console.error('Failed to load MediaPipe Camera');
+    if (!Camera) {
+        console.error('MediaPipe Camera not loaded from CDN');
         return;
     }
-    camera = new SafeCamera(videoRef.value, {
+    camera = new Camera(videoRef.value, {
       onFrame: async () => {
         if (hands && videoRef.value && videoRef.value.readyState >= 2) {
             // Safety check for dimensions
