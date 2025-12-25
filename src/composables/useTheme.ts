@@ -1,3 +1,13 @@
+/*
+ * @Author: xianggan
+ * @Date: 2025-12-25 10:12:28
+ * @LastEditors: xianggan
+ * @LastEditTime: 2025-12-25 14:28:30
+ * @FilePath: \webcam-fruit-game\src\composables\useTheme.ts
+ * @Description: 
+ * 
+ * 
+ */
 import { ref, watchEffect, onMounted, computed } from 'vue'
 
 type Theme = 'light' | 'dark'

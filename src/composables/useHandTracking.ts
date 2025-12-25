@@ -41,6 +41,16 @@ const updateCursorFromMouse = (e: MouseEvent) => {
   cursor.y = e.clientY
 }
 
+const updateCursorFromTouch = (e: TouchEvent) => {
+  lastMouseMoveTime = Date.now() // Treat touch like mouse for timeout purposes
+  cursor.source = 'mouse' // Reuse mouse logic for touch
+  cursor.active = true
+  if (e.touches.length > 0) {
+    cursor.x = e.touches[0].clientX
+    cursor.y = e.touches[0].clientY
+  }
+}
+
 const onResults = (results: Results) => {
   handData.value = results
   
@@ -82,8 +92,8 @@ const initHandTracking = (externalVideo?: HTMLVideoElement) => {
   })
 
   hands.setOptions({
-    maxNumHands: 1,
-    modelComplexity: 1,
+    maxNumHands: 2, // Enable dual hand support
+    modelComplexity: 0, // Downgrade from 1 to 0 for max speed (Lite model)
     minDetectionConfidence: 0.5,
     minTrackingConfidence: 0.5
   })
@@ -101,34 +111,84 @@ const initHandTracking = (externalVideo?: HTMLVideoElement) => {
   }
 
   if (videoRef.value) {
-    if (!Camera) {
-        console.error('MediaPipe Camera not loaded from CDN');
-        return;
-    }
-    camera = new Camera(videoRef.value, {
-      onFrame: async () => {
-        if (hands && videoRef.value && videoRef.value.readyState >= 2) {
-            // Safety check for dimensions
-            if (videoRef.value.videoWidth > 0 && videoRef.value.videoHeight > 0) {
-                 await hands.send({image: videoRef.value})
-                 isCameraReady.value = true
-            }
-        }
-      },
-      width: 1280,
-      height: 720
-    })
-    camera.start()
+    startCamera(videoRef.value)
   }
 
   // Add global mouse listener
   window.addEventListener('mousemove', updateCursorFromMouse)
+  window.addEventListener('touchstart', updateCursorFromTouch, { passive: false })
+  window.addEventListener('touchmove', updateCursorFromTouch, { passive: false })
 }
 
-const cleanupHandTracking = () => {
-  // We might NOT want to cleanup if we want global persistence, 
-  // but for now let's expose a method to stop it if needed.
-  // Ideally, we keep it running once started.
+let animationFrameId: number | null = null
+
+const startCamera = async (videoElement: HTMLVideoElement) => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: 1280,
+        height: 720,
+        facingMode: 'user'
+      }
+    })
+    
+    videoElement.srcObject = stream
+    await new Promise((resolve) => {
+      videoElement.onloadedmetadata = () => {
+        resolve(true)
+      }
+    })
+    await videoElement.play()
+    
+    // Performance optimization: Process frames at lower resolution
+    // MediaPipe Hands works well even at 360p or 480p, while we display 720p/1080p
+    const processFrame = async () => {
+      if (hands && videoElement && videoElement.readyState >= 2) {
+         if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
+            // No need to resize manually, just let MediaPipe handle it or we could draw to smaller canvas first
+            // But simply sending the video element is usually fine if modelComplexity is low
+            // For optimal perf, we can limit the FPS of detection if needed
+            await hands.send({image: videoElement})
+            isCameraReady.value = true
+         }
+      }
+      // Limit detection loop to ~30 FPS to save CPU/GPU if monitor is 60/144Hz
+      // Or just run as fast as possible. For mobile, limiting is better.
+      animationFrameId = requestAnimationFrame(processFrame)
+    }
+    processFrame()
+    
+  } catch (err) {
+    console.error('Error accessing webcam:', err)
+  }
+}
+
+const stopHandTracking = () => {
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId)
+    animationFrameId = null
+  }
+
+  if (videoRef.value && videoRef.value.srcObject) {
+    const stream = videoRef.value.srcObject as MediaStream
+    const tracks = stream.getTracks()
+    tracks.forEach(track => {
+        track.stop()
+        stream.removeTrack(track)
+    })
+    videoRef.value.srcObject = null
+  }
+
+  if (hands) {
+    try {
+      hands.close()
+    } catch (e) {
+      console.warn('Failed to close hands instance', e)
+    }
+    hands = null
+  }
+
+  isCameraReady.value = false
 }
 
 export function useHandTracking() {
@@ -137,6 +197,14 @@ export function useHandTracking() {
     handData,
     videoRef,
     isCameraReady,
-    initHandTracking
+    initHandTracking,
+    stopHandTracking
   }
+}
+
+// Handle HMR
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    stopHandTracking()
+  })
 }
