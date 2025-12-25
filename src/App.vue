@@ -1,3 +1,13 @@
+<!--
+ * @Author: xianggan
+ * @Date: 2025-12-25 10:12:28
+ * @LastEditors: xianggan
+ * @LastEditTime: 2025-12-25 11:27:15
+ * @FilePath: \webcam-fruit-game\src\App.vue
+ * @Description: 
+ * 
+ * 
+-->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useHandTracking } from '@/composables/useHandTracking'
