@@ -86,7 +86,7 @@ const initHandTracking = () => {
     return
   }
   handsInstance = new Hands({
-    locateFile: (file: string) => `/mediapipe/${file}`
+    locateFile: (file: string) => `${import.meta.env.BASE_URL}mediapipe/${file}`
   })
   handsInstance.setOptions({
     maxNumHands: 2,
