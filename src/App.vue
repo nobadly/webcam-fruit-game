@@ -13,12 +13,13 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useHandTracking } from '@/composables/useHandTracking'
 import HandCursor from '@/components/HandCursor.vue'
 
-const { setVideoElement, stopHandTracking } = useHandTracking()
+const { setVideoElement, stopHandTracking, initHandTracking } = useHandTracking()
 const webcamVideo = ref<HTMLVideoElement | null>(null)
 
 onMounted(() => {
   if (webcamVideo.value) {
     setVideoElement(webcamVideo.value)
+    initHandTracking()
   }
 })
 

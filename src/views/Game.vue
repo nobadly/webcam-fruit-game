@@ -129,6 +129,7 @@ const gameOver = () => {
 }
 
 const cleanup = () => {
+  soundManager.stopBGM()
   if (engine) {
     Matter.Engine.clear(engine)
     engine = null
@@ -156,6 +157,7 @@ const startCountdown = () => {
       countdownInterval = null
       showCountdown.value = false
       gameStarted.value = true
+      soundManager.playBGM()
       startSpawning()
     }
   }, 1000)
@@ -382,8 +384,17 @@ const initPhysics = () => {
       // Random swoosh sound
       // Check both trails
       for (const trail of handTrails.value) {
-          if (trail.length > 5 && Math.random() < 0.02) {
-            soundManager.playSwoosh()
+          if (trail.length > 5 && Math.random() < 0.05) {
+             const p1 = trail[trail.length - 1]
+             const p2 = trail[trail.length - 5]
+             // Distance in normalized coords (0-1)
+             const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y)
+             // Convert to approximate screen speed factor
+             const speed = dist * 20; 
+             
+             if (speed > 1.0) {
+                soundManager.playSwoosh(speed)
+             }
           }
       }
     }
@@ -453,9 +464,9 @@ const checkSlicing = () => {
           } else if (fruit.type === 'frenzy-banana') {
               activateFrenzy()
           }
-
+          
           bodiesToRemove.push(id.toString())
-          soundManager.playSlice()
+          soundManager.playSlice(fruit.type)
           
           // Spawn Debris
           createDebris(position.x, position.y, fruit.type, angle, currX - lastX, currY - lastY)
@@ -990,7 +1001,7 @@ onUnmounted(() => {
 
 <template>
   <div class="relative w-full h-screen overflow-hidden transition-transform duration-100 touch-none"
-       :class="{ 'translate-x-1 translate-y-1': screenShake, '-translate-x-1 -translate-y-1': !screenShake && screenShake }"
+       :class="{ 'animate-shake': screenShake }"
   >
     <!-- Cinematic Vignette Overlay (Behind Canvas) -->
     <div class="absolute inset-0 bg-radial-gradient pointer-events-none -z-0"></div>
@@ -1085,5 +1096,16 @@ onUnmounted(() => {
 <style scoped>
 .bg-radial-gradient {
   background: radial-gradient(circle at center, transparent 30%, rgba(0, 0, 0, 0.6) 100%);
+}
+
+.animate-shake {
+  animation: shake 0.2s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
 }
 </style>

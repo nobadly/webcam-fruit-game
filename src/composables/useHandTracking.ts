@@ -33,8 +33,7 @@ const handData = ref<Results | null>(null)
 const videoRef = ref<HTMLVideoElement | null>(null)
 const isCameraReady = ref(false)
 
-let camera: any = null
-let hands: any = null
+let handsInstance: any = null
 
 // Mouse fallback logic
 let lastMouseMoveTime = 0
@@ -60,62 +59,42 @@ const updateCursorFromTouch = (e: TouchEvent) => {
 
 const onResults = (results: Results) => {
   handData.value = results
-  
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     const landmarks = results.multiHandLandmarks[0]
     const indexTip = landmarks[8]
-    
-    // Check if we should prioritize hand
     if (Date.now() - lastMouseMoveTime > MOUSE_TIMEOUT) {
       cursor.source = 'hand'
       cursor.active = true
-      // Mirror x for natural interaction
       cursor.x = (1 - indexTip.x) * window.innerWidth
       cursor.y = indexTip.y * window.innerHeight
     }
   } else {
-    // If using hand and lost tracking, hide cursor or keep last position?
-    // If using mouse, do nothing.
-    if (cursor.source === 'hand') {
-      cursor.active = false
-    }
+    if (cursor.source === 'hand') cursor.active = false
   }
 }
 
 const setVideoElement = (el: HTMLVideoElement) => {
   videoRef.value = el
-  // If hands initialized but camera not started (because videoRef was null), start it now
-  if (hands && !isCameraReady.value) {
-      startCamera(el)
-  }
+  if (handsInstance && !isCameraReady.value) startCamera(el)
 }
 
 const initHandTracking = () => {
-  if (hands) return // Already initialized
-
-  // Access globals from CDN scripts
-  const Hands = window.Hands;
-  const Camera = window.Camera;
-
+  if (handsInstance) return
+  const Hands = window.Hands
   if (!Hands) {
-    console.error('MediaPipe Hands not loaded from CDN');
-    return;
+    console.error('MediaPipe Hands not loaded')
+    return
   }
-
-  hands = new Hands({
-    locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+  handsInstance = new Hands({
+    locateFile: (file: string) => `/mediapipe/${file}`
   })
-
-  hands.setOptions({
-    maxNumHands: 2, // Enable dual hand support
-    modelComplexity: 0, // Downgrade from 1 to 0 for max speed (Lite model)
+  handsInstance.setOptions({
+    maxNumHands: 2,
+    modelComplexity: 0,
     minDetectionConfidence: 0.5,
     minTrackingConfidence: 0.5
   })
-
-  hands.onResults(onResults)
-
-  // Start camera if video element is available
+  handsInstance.onResults(onResults)
   if (videoRef.value) {
     startCamera(videoRef.value)
   }
@@ -127,12 +106,14 @@ const initHandTracking = () => {
 }
 
 let animationFrameId: number | null = null
+let lastDetectTime = 0
+const DETECT_INTERVAL_MS = 33 // ~30 FPS
 
 const startCamera = async (videoElement: HTMLVideoElement) => {
   try {
     // Check if stream already exists
     if (videoElement.srcObject) return
-
+ 
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         width: { ideal: 1280 },
@@ -142,40 +123,55 @@ const startCamera = async (videoElement: HTMLVideoElement) => {
     })
     
     videoElement.srcObject = stream
+    videoElement.muted = true
+    videoElement.autoplay = true
+    videoElement.setAttribute('playsinline', 'true')
     await new Promise((resolve) => {
       videoElement.onloadedmetadata = () => {
         resolve(true)
       }
     })
-    await videoElement.play()
+    try {
+      await videoElement.play()
+    } catch {
+      const tryPlay = () => {
+        videoElement.play().catch(() => {})
+        window.removeEventListener('click', tryPlay)
+        window.removeEventListener('touchstart', tryPlay)
+        window.removeEventListener('keydown', tryPlay)
+      }
+      window.addEventListener('click', tryPlay)
+      window.addEventListener('touchstart', tryPlay)
+      window.addEventListener('keydown', tryPlay)
+    }
     
-    // Performance optimization: Process frames at lower resolution
-    // MediaPipe Hands works well even at 360p or 480p, while we display 720p/1080p
     const processFrame = async () => {
-      // Check active state
-      if (!hands || !videoElement.srcObject) {
+      if (!handsInstance || !videoElement.srcObject) {
          if (animationFrameId) cancelAnimationFrame(animationFrameId)
          return 
       }
 
       if (videoElement.readyState >= 2) {
          if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
-            // No need to resize manually, just let MediaPipe handle it or we could draw to smaller canvas first
-            // But simply sending the video element is usually fine if modelComplexity is low
-            // For optimal perf, we can limit the FPS of detection if needed
-            await hands.send({image: videoElement})
-            isCameraReady.value = true
+            try {
+                const now = performance.now()
+                if (now - lastDetectTime >= DETECT_INTERVAL_MS) {
+                  lastDetectTime = now
+                  await handsInstance.send({ image: videoElement })
+                }
+                isCameraReady.value = true
+            } catch (e) {
+                console.warn('Frame processing skipped', e)
+            }
          }
       }
-      // Limit detection loop to ~30 FPS to save CPU/GPU if monitor is 60/144Hz
-      // Or just run as fast as possible. For mobile, limiting is better.
+      
       animationFrameId = requestAnimationFrame(processFrame)
     }
     processFrame()
     
   } catch (err) {
     console.error('Error accessing webcam:', err)
-    // If camera fails, we should still set ready so game can proceed with mouse/touch
     isCameraReady.value = true 
   }
 }
@@ -196,15 +192,11 @@ const stopHandTracking = () => {
     videoRef.value.srcObject = null
   }
 
-  if (hands) {
-    try {
-      hands.close()
-    } catch (e) {
-      console.warn('Failed to close hands instance', e)
-    }
-    hands = null
+  if (handsInstance) {
+    try { handsInstance.close() } catch {}
+    handsInstance = null
   }
-
+  
   isCameraReady.value = false
 }
 
